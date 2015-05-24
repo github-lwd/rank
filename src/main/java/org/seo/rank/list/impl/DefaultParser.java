@@ -22,8 +22,10 @@ package org.seo.rank.list.impl;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+
 import org.apache.commons.lang.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -108,79 +110,115 @@ public class DefaultParser implements Parser{
         }
         return null;
     }
-    private static void run(String url, String nextPageCssQuery, String nextPageText, String titleCssQuery){
+    public static List<Article> run(String url, String nextPageCssQuery, String nextPageText, String titleCssQuery){
         Parser parser = new DefaultParser();
         long start = System.currentTimeMillis();
         List<Article> articles = parser.parse(url, nextPageCssQuery, nextPageText, titleCssQuery);
         long cost = System.currentTimeMillis() - start;
         int i=1;
         for(Article article : articles){
-            System.out.println((i++)+"、"+article.getTitle()+" : "+article.getUrl());
+            LOGGER.info((i++) + "、" + article.getTitle() + " : " + article.getUrl());
         }
-        System.out.println("采集文章 "+articles.size()+" 篇耗时："+cost/1000.0+" 秒");
+        LOGGER.info("采集文章 " + articles.size() + " 篇耗时：" + cost / 1000.0 + " 秒");
+        return articles;
     }
-    private static void iteyeBlog(){
+    public static List<Article> iteyeBlog(){
         String url = "http://yangshangchuan.iteye.com/";
         String nextPageCssQuery = "html body div#page div#content.clearfix div#main div.pagination a.next_page";
         String nextPageText = "下一页 »";
         String titleCssQuery = "html body div#page div#content.clearfix div#main div.blog_main div.blog_title h3 a";
-        run(url, nextPageCssQuery, nextPageText, titleCssQuery);
+        return run(url, nextPageCssQuery, nextPageText, titleCssQuery);
     }
-    private static void iteyeNews(){
+    public static List<Article> iteyeNews(){
         String url = "http://www.iteye.com/news";
         String nextPageCssQuery = "html body div#page div#content.clearfix div#main div#index_main div.pagination a.next_page";
         String nextPageText = "下一页 »";
         //h3 > a表示h3后直接跟着a，这样 h3 span.category a 就不会被选择
         String titleCssQuery = "html body div#page div#content.clearfix div#main div#index_main div.news.clearfix div.content h3 > a";
-        run(url, nextPageCssQuery, nextPageText, titleCssQuery);
+        return run(url, nextPageCssQuery, nextPageText, titleCssQuery);
     }
-    private static void iteyeMagazines(){
+    public static List<Article> iteyeMagazines(){
         String url = "http://www.iteye.com/magazines";
         String nextPageCssQuery = "html body div#page div#content.clearfix div#main div#index_main div.pagination a.next_page";
         String nextPageText = "下一页 »";
         String titleCssQuery = "html body div#page div#content.clearfix div#main div#index_main div.news.clearfix div.content h3 a";
-        run(url, nextPageCssQuery, nextPageText, titleCssQuery);
+        return run(url, nextPageCssQuery, nextPageText, titleCssQuery);
     }
-    private static void csdnBlog(){
+    public static List<Article> csdnBlog(){
         String url = "http://blog.csdn.net/iispring";
         String nextPageCssQuery = "html body div#container div#body div#main div.main div#papelist.pagelist a";
         String titleCssQuery = "html body div#container div#body div#main div.main div#article_list.list div.list_item.article_item div.article_title h1 span.link_title a";
         String nextPageText = "下一页";
-        run(url, nextPageCssQuery, nextPageText, titleCssQuery);
+        return run(url, nextPageCssQuery, nextPageText, titleCssQuery);
     }
-    private static void oschinaNews(){
+    public static List<Article> oschinaNews(){
         String url = "http://www.oschina.net/news";
         String nextPageCssQuery = "html body div#OSC_Screen div#OSC_Content.CenterDiv div#NewsChannel.Channel div#NewsList.ListPanel div#RecentNewsList.panel ul.pager li.page.next a";
         String titleCssQuery = "html body div#OSC_Screen div#OSC_Content.CenterDiv div#NewsChannel.Channel div#NewsList.ListPanel div#RecentNewsList.panel ul.List li h2 a";
         String nextPageText = ">";
-        run(url, nextPageCssQuery, nextPageText, titleCssQuery);
+        return run(url, nextPageCssQuery, nextPageText, titleCssQuery);
     }
-    private static void baidu(String query){
+    public static List<Article> oschinaBlog(){
+        String url = "http://my.oschina.net/apdplat/blog";
+        String nextPageCssQuery = "html body div#OSC_Screen div#OSC_Content div.SpaceList.BlogList ul.pager li.page.next a";
+        String titleCssQuery = "html body div#OSC_Screen div#OSC_Content div.SpaceList.BlogList ul li.Blog div.BlogTitle div.title h2 a";
+        String nextPageText = ">";
+        return run(url, nextPageCssQuery, nextPageText, titleCssQuery);
+    }
+    public static List<Article> baidu(String query){
         //对查询词进行编码
         try {
             query = URLEncoder.encode(query, "UTF-8");
         } catch (UnsupportedEncodingException e) {
             LOGGER.error("url构造失败", e);
-            return ;
+            return Collections.emptyList();
         }
         if(StringUtils.isBlank(query)){
-            return ;
+            return Collections.emptyList();
         }
         String url = "http://www.baidu.com/s?wd=" + query;
         String nextPageCssQuery = "html body div div div p#page a.n";
         String titleCssQuery = "html body div div div div div h3.t a";
         String nextPageText = "下一页>";
-        run(url, nextPageCssQuery, nextPageText, titleCssQuery);
+        return run(url, nextPageCssQuery, nextPageText, titleCssQuery);
+    }
+
+    /**
+     * 比较我的OSCHINA博客和ITEYE博客的异同
+     */
+    public static void blogCompare(){
+        List<Article> ob = oschinaBlog();
+        List<Article> ib = iteyeBlog();
+        Map<String, String> om = new HashMap<>();
+        Map<String, String> im = new HashMap<>();
+        ob.stream().forEach(b->om.put(b.getTitle(), b.getUrl()));
+        ib.stream().forEach(b->im.put(b.getTitle(), b.getUrl()));
+        List<String> iteyeBlog   = ib.stream().map(b -> b.getTitle().replace("[置顶]", "").trim()).sorted().collect(Collectors.toList());
+        List<String> oschinaBlog = ob.stream().map(b -> b.getTitle()).sorted().collect(Collectors.toList());
+
+        List<String> commons = oschinaBlog.stream().filter(b -> iteyeBlog.contains(b)).collect(Collectors.toList());
+        LOGGER.info("<h4>oschina和iteye都有("+commons.size()+")：</h4>");
+        AtomicInteger j = new AtomicInteger();
+        commons.forEach(item -> LOGGER.info(j.incrementAndGet()+"、"+item+"    <a target=\"_blank\" href=\""+om.get(item)+"\">oschina</a>    <a target=\"_blank\" href=\""+im.get(item)+"\">iteye</a><br/>"));
+
+        List<String> oschina = oschinaBlog.stream().filter(i -> !iteyeBlog.contains(i)).collect(Collectors.toList());
+        LOGGER.info("<h4>oschina独有("+oschina.size()+")：</h4>");
+        AtomicInteger l = new AtomicInteger();
+        oschina.forEach(item -> LOGGER.info(l.incrementAndGet()+"、<a target=\"_blank\" href=\""+om.get(item)+"\">"+item+"</a><br/>"));
+
+        List<String> iteye = iteyeBlog.stream().filter(i -> !oschinaBlog.contains(i)).collect(Collectors.toList());
+        LOGGER.info("<h4>iteye独有("+iteye.size()+")：</h4>");
+        AtomicInteger k = new AtomicInteger();
+        iteye.forEach(item -> LOGGER.info(k.incrementAndGet()+"、<a target=\"_blank\" href=\""+im.get(item)+"\">"+item+"</a><br/>"));
     }
     public static void main(String[] args){
-        System.getProperties().put("proxySet", "true");
-        System.getProperties().put("proxyHost", "host");
-        System.getProperties().put("proxyPort", "port"); 
         //iteyeBlog();
         //iteyeNews();
         //iteyeMagazines();
         //csdnBlog();
         //oschinaNews();
-        baidu("Java应用级产品开发平台APDPlat作者杨尚川专访");
+        //oschinaBlog();
+        //baidu("Java应用级产品开发平台APDPlat作者杨尚川专访");
+        blogCompare();
     }
 }

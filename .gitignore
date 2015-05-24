@@ -1,3 +1,12 @@
-/target/
-/logs/
-/nb-configuration.xml
+.settings/
+.classpath
+.project
+target/
+logs/
+data/
+.idea/
+Rank.iml
+Rank.ipr
+Rank.iws
+.gradle/
+build/
